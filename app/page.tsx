@@ -47,6 +47,7 @@ import {
   pushFullStateToSheets,
   pullFullStateFromSheets
 } from '../lib/google-sheets';
+import { exportToExcel, importFromExcel } from '../lib/excel-export';
 
 // Default mock/standard data to populate initial load
 const DEFAULT_STATE: AppState = {
@@ -290,6 +291,37 @@ export default function ChurchFinanceApp() {
   const saveState = (newState: AppState) => {
     setState(newState);
     localStorage.setItem('church_finance_management_state', JSON.stringify(newState));
+  };
+
+  // Excel Export action
+  const handleExportExcel = () => {
+    try {
+      exportToExcel(state);
+    } catch (err: any) {
+      console.error('Excel Export Error:', err);
+      alert(`Export failed: ${err.message || 'Unknown error occurred while formatting Excel columns.'}`);
+    }
+  };
+
+  // Excel Import action
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    triggerConfirmation(
+      'Import Financial Schema from Excel?',
+      'This will OVERWRITE your active browser ledger storage with the spreadsheet contents of the uploaded Excel file. Confirm if you have a downloaded backup first.',
+      async () => {
+        try {
+          const parsedState = await importFromExcel(file);
+          saveState(parsedState);
+          alert('Excel import successful! All worksheets successfully mapped into your financial workspace dashboards.');
+        } catch (err: any) {
+          console.error('Excel Import Error:', err);
+          alert(`Import failed: ${err.message || 'Please check that the file is a valid .xlsx file conforming to the standard template.'}`);
+        }
+      }
+    );
   };
 
   // Google OAuth Popup response event listener
@@ -942,6 +974,19 @@ export default function ChurchFinanceApp() {
           </button>
 
           <button
+            onClick={() => { setActiveTab('excel'); setMobileMenuOpen(false); }}
+            className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
+              activeTab === 'excel' ? 'bg-[#107C41] text-white font-semibold shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+            }`}
+          >
+            <Download size={18} className="text-emerald-400" />
+            <span className="flex items-center gap-1.5">
+              Excel Workbooks 
+              <span className="bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded text-[9px] font-bold font-mono">Offline</span>
+            </span>
+          </button>
+
+          <button
             onClick={() => { setActiveTab('sheets_sync'); setMobileMenuOpen(false); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
               activeTab === 'sheets_sync' ? 'bg-indigo-600 text-white font-medium shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
@@ -1017,6 +1062,40 @@ export default function ChurchFinanceApp() {
         {/* ------------------------------------------------------------- */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
+            {/* MICROSOFT EXCEL POWERED COMPANION PANEL */}
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-xl p-5 text-white shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-emerald-500/10">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="bg-[#107C41] text-white px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider font-mono shadow-sm">Microsoft Excel Support</span>
+                  <span className="text-emerald-100/80">•</span>
+                  <span className="text-[11px] font-mono text-emerald-100 font-semibold">Offline Workbook Sync Mode</span>
+                </div>
+                <h3 className="text-base font-bold tracking-tight">Prefer working directly in Microsoft Excel?</h3>
+                <p className="text-xs text-emerald-100/90 max-w-2xl leading-relaxed">
+                  Export this entire financial system database into a beautifully formatted, multi-tab Excel spreadsheet workbook. Edit transaction ledgers, category definitions, funds, annual budgets, or statement audits in Excel, and upload it back here instantly any time.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={handleExportExcel}
+                  className="bg-white hover:bg-emerald-50 text-emerald-700 px-3.5 py-2.5 rounded-lg text-xs font-bold shadow-sm flex items-center space-x-2 cursor-pointer transition-all duration-150"
+                >
+                  <Download size={14} className="stroke-[2.5]" />
+                  <span>Download Excel Booklet (.xlsx)</span>
+                </button>
+                <label className="bg-emerald-800/80 hover:bg-emerald-800 text-white border border-emerald-500/30 px-3.5 py-2.5 rounded-lg text-xs font-bold shadow-sm flex items-center space-x-2 cursor-pointer transition-all duration-150 relative">
+                  <Upload size={14} className="stroke-[2.5]" />
+                  <span>Import Excel Workbook</span>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handleImportExcel}
+                  />
+                </label>
+              </div>
+            </div>
+
             {/* Primary KPI row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center space-x-4">
@@ -1603,6 +1682,90 @@ export default function ChurchFinanceApp() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB CONTENT: EXCEL WORKBOOK WORKSPACE */}
+        {/* ------------------------------------------------------------- */}
+        {activeTab === 'excel' && (
+          <div className="space-y-6">
+            {/* Main stats card */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+              <div className="flex items-center space-x-3 pb-4 border-b">
+                <div className="p-3 bg-emerald-50 text-[#107C41] rounded-lg">
+                  <Download size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Microsoft Excel Companion Portal</h3>
+                  <p className="text-xs text-slate-500 font-mono">Bilateral .xlsx mapping for offline financial control</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* Export Column */}
+                <div className="space-y-4 border-r border-slate-100 pr-0 md:pr-6">
+                  <span className="bg-emerald-50 text-[#107C41] border border-emerald-200/50 px-2 py-0.5 rounded text-[10px] uppercase font-bold font-mono">Download Booklet</span>
+                  <h4 className="text-sm font-bold text-slate-800 font-sans">1. Export Active Ledger to Excel Booklet</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Instantly package your church&apos;s active local state registry—including custom funds, categorised transactions, budgets, ledger audits, and calculated summaries—into a structured Excel workbook file format.
+                  </p>
+                  
+                  <div className="bg-slate-50 p-4 rounded-xl border space-y-3">
+                    <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-mono">Export Package Contents Includes:</h5>
+                    <ul className="text-[11px] text-slate-500 font-mono space-y-1.5 pl-3 list-disc">
+                      <li><strong>Settings Worksheet:</strong> Church name, starting asset baseline</li>
+                      <li><strong>Categories Worksheet:</strong> Income/expense column lists</li>
+                      <li><strong>Funds Worksheet:</strong> Restricted and unrestricted reserves balance</li>
+                      <li><strong>Transactions Worksheet:</strong> Complete history with reference codes</li>
+                      <li><strong>Budget Worksheet:</strong> Annual target allocations vs spending</li>
+                      <li><strong>Bank Reconciliation Worksheet:</strong> Book vs bank audit list</li>
+                      <li><strong>Monthly Summary Report:</strong> Automatic fiscal monthly summary</li>
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={handleExportExcel}
+                    className="w-full bg-[#107C41] hover:bg-[#0E6C38] text-white py-3 px-4 rounded-xl text-xs font-bold shadow hover:shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer"
+                  >
+                    <Download size={14} className="stroke-[2.5]" />
+                    <span>Generate & Download Excel Workbook (.xlsx)</span>
+                  </button>
+                </div>
+
+                {/* Import Column */}
+                <div className="space-y-4">
+                  <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/50 px-2 py-0.5 rounded text-[10px] uppercase font-bold font-mono">Import Booklet</span>
+                  <h4 className="text-sm font-bold text-slate-800 font-sans">2. Upload/Restore Financial System from Excel Sheet</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Have you made changes in Excel offline? Upload your formatted workbook back. Ensure all workshop names (Tabs) match the expected format exactly.
+                  </p>
+
+                  <div className="border-2 border-dashed border-slate-200 hover:border-emerald-500 rounded-xl p-8 text-center bg-slate-50 transition-all flex flex-col items-center justify-center space-y-3 cursor-pointer relative">
+                    <div className="p-3 bg-white rounded-full shadow-sm text-slate-400">
+                      <Upload size={24} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-700">Drag & drop your Excel file here, or click to browse</p>
+                      <p className="text-[10px] text-slate-400 font-mono">Supports Microsoft Excel Standard Workbooks (.xlsx, .xls)</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".xlsx, .xls"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={handleImportExcel}
+                    />
+                  </div>
+
+                  <div className="bg-slate-50 p-4 rounded-xl border space-y-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-widest font-mono">Spreadsheet Schema Recommendations:</h5>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      To prevent structural mismatches, you should always start by exporting an Excel booklet first, edit your entries keeping the first row (Headers) intact in Excel, and then import it back.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
