@@ -1,0 +1,6 @@
+{
+  "name": "Church Financial Management",
+  "description": "An interactive, fully featured financial management system for churches to manage income, expenses, funds, budgets, and bank reconciliations, complete with active Google Sheets synchronization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
