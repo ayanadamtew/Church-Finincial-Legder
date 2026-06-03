@@ -31,7 +31,8 @@ import {
   Filter,
   Search,
   ExternalLink,
-  Menu
+  Menu,
+  FileText
 } from 'lucide-react';
 import {
   AppSettings,
@@ -47,7 +48,6 @@ import {
   pushFullStateToSheets,
   pullFullStateFromSheets
 } from '../lib/google-sheets';
-import { exportToExcel, importFromExcel } from '../lib/excel-export';
 
 // Default mock/standard data to populate initial load
 const DEFAULT_STATE: AppState = {
@@ -188,6 +188,18 @@ const REQUIRED_SHEETS = [
   'Bank Reconciliation'
 ];
 
+const generateMonthlyPDFReport = async (state: AppState, monthNum: number, monthName: string) => {
+  const { generateMonthlyPDFReport: gen } = await import('../lib/pdf-generator');
+  await gen(state, monthNum, monthName);
+};
+
+const generateAnnualPDFReport = async (state: AppState) => {
+  const { generateAnnualPDFReport: gen } = await import('../lib/pdf-generator');
+  await gen(state);
+};
+
+export const dynamic = 'force-dynamic';
+
 export default function ChurchFinanceApp() {
   // Global states
   const [state, setState] = useState<AppState>(DEFAULT_STATE);
@@ -294,8 +306,9 @@ export default function ChurchFinanceApp() {
   };
 
   // Excel Export action
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     try {
+      const { exportToExcel } = await import('../lib/excel-export');
       exportToExcel(state);
     } catch (err: any) {
       console.error('Excel Export Error:', err);
@@ -313,6 +326,7 @@ export default function ChurchFinanceApp() {
       'This will OVERWRITE your active browser ledger storage with the spreadsheet contents of the uploaded Excel file. Confirm if you have a downloaded backup first.',
       async () => {
         try {
+          const { importFromExcel } = await import('../lib/excel-export');
           const parsedState = await importFromExcel(file);
           saveState(parsedState);
           alert('Excel import successful! All worksheets successfully mapped into your financial workspace dashboards.');
@@ -1507,6 +1521,30 @@ export default function ChurchFinanceApp() {
         {/* ------------------------------------------------------------- */}
         {activeTab === 'reports' && (
           <div className="space-y-6">
+            {/* OFFICIAL PDF REPORT COMPLIANCE HUB */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-6 text-white shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-6 border border-indigo-500/10">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider font-mono shadow-sm">PDF Compliance</span>
+                  <span className="text-indigo-200/50">•</span>
+                  <span className="text-[11px] font-mono text-indigo-200 font-semibold">Official Trustees Audit</span>
+                </div>
+                <h3 className="text-base font-bold tracking-tight text-white font-sans">Official Fiscal & Operational PDF Statements</h3>
+                <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                  Generate beautiful, signature-ready, multi-page financial statements in high-fidelity PDF format. Includes fully calculated capital funds reserves impact, department budget compliance assessments, bank statement audit records, and formal trustee/pastor attestation lines.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => generateAnnualPDFReport(state)}
+                  className="bg-indigo-600 hover:bg-slate-50 hover:text-indigo-950 border border-indigo-400/20 px-4 py-3 rounded-lg text-xs font-bold shadow-md hover:shadow-lg flex items-center space-x-2 cursor-pointer transition-all duration-150 text-white"
+                >
+                  <FileText size={15} className="stroke-[2.5]" />
+                  <span>Download Annual Statement (.pdf)</span>
+                </button>
+              </div>
+            </div>
+
             {/* Top Summarization widgets */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-2 text-center">
@@ -1567,11 +1605,12 @@ export default function ChurchFinanceApp() {
                       <th className="p-4 font-bold">Recurrent Expense</th>
                       <th className="p-4 font-bold">Net Operational Balance</th>
                       <th className="p-4 font-bold">Surplus Ratio Status</th>
+                      <th className="p-4 font-bold text-center">Statement Booklet</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-mono">
                     {monthlySummaries.map(m => (
-                      <tr key={`month-${m.monthNum}`} className="hover:bg-indigo-50/15 transition-colors">
+                      <tr key={`month-${m.monthNum}`} className="hover:bg-indigo-50/15 transition-colors animate-fade-in">
                         <td className="p-4 font-bold text-slate-900">{m.monthName}</td>
                         <td className="p-4 font-semibold text-emerald-700">+{formatMoney(m.income)}</td>
                         <td className="p-4 font-semibold text-rose-600">-{formatMoney(m.expense)}</td>
@@ -1580,7 +1619,7 @@ export default function ChurchFinanceApp() {
                         </td>
                         <td className="p-4">
                           {m.income === 0 && m.expense === 0 ? (
-                            <span className="text-slate-400 italic">No activity</span>
+                            <span className="text-slate-400 italic font-sans">No activity</span>
                           ) : m.net >= 0 ? (
                             <span className="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-semibold">
                               {(m.net / (m.income || 1) * 100).toFixed(0)}% Surplus
@@ -1590,6 +1629,15 @@ export default function ChurchFinanceApp() {
                               Deficit Gap
                             </span>
                           )}
+                        </td>
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => generateMonthlyPDFReport(state, m.monthNum, m.monthName)}
+                            className="inline-flex items-center space-x-1.5 bg-indigo-50 hover:bg-indigo-100 text-[#4f46e5] px-3 py-1.5 rounded-lg text-[11px] font-bold border border-indigo-100 transition-colors cursor-pointer"
+                          >
+                            <FileText size={12} className="stroke-[2.5]" />
+                            <span>Print PDF</span>
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1828,7 +1876,7 @@ export default function ChurchFinanceApp() {
                       <li>Create an OAuth 2.0 Client ID for a <strong>Web Application</strong>.</li>
                       <li>Add the following URLs to <strong>Authorized JavaScript Origins</strong>:
                         <ul className="list-disc pl-4 mt-1 font-mono text-[10px] bg-slate-50 p-1.5 rounded space-y-0.5">
-                          <li>{window.location.origin}</li>
+                          <li>{typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}</li>
                           <li>https://ais-dev-rxdw7wytvp2fkkbeypdec4-257327972633.europe-west2.run.app</li>
                         </ul>
                       </li>
